@@ -1,4 +1,5 @@
 using FinDocReview.Infrastructure.Data;
+using FinDocReview.Infrastructure.Services;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 
@@ -21,6 +22,9 @@ builder.Services.AddDefaultIdentity<IdentityUser>(options =>
 // Blazor
 builder.Services.AddRazorPages();
 builder.Services.AddServerSideBlazor();
+// Infrastructure services
+builder.Services.AddScoped<DocumentService>();
+builder.Services.AddScoped<LocalStorageService>();
 
 var app = builder.Build();
 

@@ -1,0 +1,102 @@
+﻿@page "/documents"
+@using FinDocReview.Core.Entities
+@using FinDocReview.Infrastructure.Services
+@inject DocumentService DocumentService
+@inject AuthenticationStateProvider AuthStateProvider
+
+<PageTitle>Documents</PageTitle>
+
+<h3>My Documents</h3>
+
+<AuthorizeView>
+    <Authorized>
+        <div class="mb-3">
+            <a href="/upload" class="btn btn-primary">
+                <span class="oi oi-cloud-upload me-2"></span>Upload New
+            </a>
+        </div>
+
+        @if (_isLoading)
+        {
+            <p>Loading...</p>
+        }
+        else if (_documents.Count == 0)
+        {
+            <div class="alert alert-info">
+                No documents yet. <a href="/upload">Upload your first document.</a>
+            </div>
+        }
+        else
+        {
+            <table class="table table-hover">
+                <thead>
+                    <tr>
+                        <th>File Name</th>
+                        <th>Size</th>
+                        <th>Status</th>
+                        <th>Uploaded</th>
+                        <th></th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var doc in _documents)
+                    {
+                        <tr>
+                            <td>@doc.FileName</td>
+                            <td>@FormatFileSize(doc.FileSizeBytes)</td>
+                            <td>
+                                <span class="badge @GetStatusBadgeClass(doc.Status)">
+                                    @doc.Status
+                                </span>
+                            </td>
+                            <td>@doc.UploadedAt.ToString("yyyy-MM-dd HH:mm")</td>
+                            <td>
+                                <a href="/documents/@doc.Id" class="btn btn-sm btn-outline-primary">
+                                    View
+                                </a>
+                            </td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        }
+    </Authorized>
+    <NotAuthorized>
+        <div class="alert alert-warning">
+            Please <a href="/Identity/Account/Login">log in</a> to view documents.
+        </div>
+    </NotAuthorized>
+</AuthorizeView>
+
+@code {
+    private List<Document> _documents = [];
+    private bool _isLoading = true;
+
+    protected override async Task OnInitializedAsync()
+    {
+        var authState = await AuthStateProvider.GetAuthenticationStateAsync();
+        var userId = authState.User.FindFirst(
+            System.Security.Claims.ClaimTypes.NameIdentifier)?.Value;
+
+        if (!string.IsNullOrEmpty(userId))
+            _documents = await DocumentService.GetUserDocumentsAsync(userId);
+
+        _isLoading = false;
+    }
+
+    private static string GetStatusBadgeClass(DocumentStatus status) => status switch
+    {
+        DocumentStatus.Pending => "bg-secondary",
+        DocumentStatus.Processing => "bg-warning text-dark",
+        DocumentStatus.Completed => "bg-success",
+        DocumentStatus.Failed => "bg-danger",
+        _ => "bg-secondary"
+    };
+
+    private static string FormatFileSize(long bytes) => bytes switch
+    {
+        < 1024 => $"{bytes} B",
+        < 1024 * 1024 => $"{bytes / 1024} KB",
+        _ => $"{bytes / (1024 * 1024):F1} MB"
+    };
+}
