@@ -1,0 +1,8 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/FinDocReview.Core/FinDocReview.Core.csproj" />
+    <Project Path="src/FinDocReview.Infrastructure/FinDocReview.Infrastructure.csproj" />
+    <Project Path="src/FinDocReview.Tests/FinDocReview.Tests.csproj" />
+    <Project Path="src/FinDocReview.Web/FinDocReview.Web.csproj" />
+  </Folder>
+</Solution>
