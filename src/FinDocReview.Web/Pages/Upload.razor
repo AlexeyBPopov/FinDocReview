@@ -1,0 +1,140 @@
+﻿@page "/upload"
+@using FinDocReview.Infrastructure.Services
+@using Microsoft.AspNetCore.Components.Forms
+@inject DocumentService DocumentService
+@inject NavigationManager Navigation
+@inject AuthenticationStateProvider AuthStateProvider
+
+<PageTitle>Upload Document</PageTitle>
+
+<h3>Upload Document</h3>
+
+<AuthorizeView>
+    <Authorized>
+        <div class="row">
+            <div class="col-md-6">
+                @if (!string.IsNullOrEmpty(_errorMessage))
+                {
+                    <div class="alert alert-danger">@_errorMessage</div>
+                }
+                @if (_uploadSuccess)
+                {
+                    <div class="alert alert-success">
+                        Document uploaded successfully! Processing will begin shortly.
+                    </div>
+                }
+
+                <div class="card">
+                    <div class="card-body">
+                        <InputFile OnChange="HandleFileSelected" accept=".pdf,.txt,.docx" class="form-control mb-3" />
+
+                        @if (_selectedFile != null)
+                        {
+                            <div class="mb-3">
+                                <small class="text-muted">
+                                    @_selectedFile.Name (@FormatFileSize(_selectedFile.Size))
+                                </small>
+                            </div>
+                        }
+
+                        <button class="btn btn-primary"
+                                @onclick="HandleUpload"
+                                disabled="@(_selectedFile == null || _isUploading)">
+                            @if (_isUploading)
+                            {
+                                <span class="spinner-border spinner-border-sm me-2"></span>
+                                <span>Uploading...</span>
+                            }
+                            else
+                            {
+                                <span>Upload Document</span>
+                            }
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </Authorized>
+    <NotAuthorized>
+        <div class="alert alert-warning">
+            Please <a href="/Identity/Account/Login">log in</a> to upload documents.
+        </div>
+    </NotAuthorized>
+</AuthorizeView>
+
+@code {
+    private IBrowserFile? _selectedFile;
+    private bool _isUploading;
+    private bool _uploadSuccess;
+    private string? _errorMessage;
+
+    private const long MaxFileSize = 20 * 1024 * 1024; // 20MB
+
+    private void HandleFileSelected(InputFileChangeEventArgs e)
+    {
+        _selectedFile = e.File;
+        _errorMessage = null;
+        _uploadSuccess = false;
+    }
+
+    private async Task HandleUpload()
+    {
+        if (_selectedFile == null) return;
+
+        if (_selectedFile.Size > MaxFileSize)
+        {
+            _errorMessage = "File size exceeds 20MB limit.";
+            return;
+        }
+
+        var allowed = new[] { ".pdf", ".txt", ".docx" };
+        var ext = Path.GetExtension(_selectedFile.Name).ToLowerInvariant();
+        if (!allowed.Contains(ext))
+        {
+            _errorMessage = "Only PDF, TXT and DOCX files are allowed.";
+            return;
+        }
+
+        _isUploading = true;
+        _errorMessage = null;
+
+        try
+        {
+            var authState = await AuthStateProvider.GetAuthenticationStateAsync();
+            var userId = authState.User.FindFirst(
+                System.Security.Claims.ClaimTypes.NameIdentifier)?.Value;
+
+            if (string.IsNullOrEmpty(userId))
+            {
+                _errorMessage = "Unable to identify user. Please log in again.";
+                return;
+            }
+
+            await using var stream = _selectedFile.OpenReadStream(MaxFileSize);
+            await DocumentService.UploadDocumentAsync(
+                stream,
+                _selectedFile.Name,
+                _selectedFile.ContentType,
+                _selectedFile.Size,
+                userId);
+
+            _uploadSuccess = true;
+            _selectedFile = null;
+        }
+        catch (Exception ex)
+        {
+            _errorMessage = $"Upload failed: {ex.Message}";
+        }
+        finally
+        {
+            _isUploading = false;
+        }
+    }
+
+    private static string FormatFileSize(long bytes) => bytes switch
+    {
+        < 1024 => $"{bytes} B",
+        < 1024 * 1024 => $"{bytes / 1024} KB",
+        _ => $"{bytes / (1024 * 1024):F1} MB"
+    };
+}
