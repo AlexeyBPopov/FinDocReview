@@ -8,11 +8,16 @@ public class DocumentService
 {
     private readonly AppDbContext _db;
     private readonly LocalStorageService _storage;
+    private readonly DocumentProcessingService _processingService;
 
-    public DocumentService(AppDbContext db, LocalStorageService storage)
+    public DocumentService(
+        AppDbContext db,
+        LocalStorageService storage,
+        DocumentProcessingService processingService)
     {
         _db = db;
         _storage = storage;
+        _processingService = processingService;
     }
 
     public async Task<Document> UploadDocumentAsync(
@@ -37,6 +42,9 @@ public class DocumentService
 
         _db.Documents.Add(document);
         await _db.SaveChangesAsync(ct);
+
+        // Enqueue for processing
+        await _processingService.EnqueueAsync(document.Id, ct);
 
         return document;
     }
