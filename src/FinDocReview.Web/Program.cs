@@ -46,6 +46,8 @@ builder.Services.AddScoped<TextExtractionService>();
 builder.Services.AddScoped<ChunkingService>();
 builder.Services.AddScoped<EmbeddingService>();
 builder.Services.AddScoped<AiSummarizationService>();
+builder.Services.AddScoped<SemanticSearchService>();
+builder.Services.AddScoped<QaService>();
 builder.Services.AddSingleton<DocumentProcessingService>();
 builder.Services.AddHostedService(sp => sp.GetRequiredService<DocumentProcessingService>());
 
