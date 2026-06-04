@@ -1,0 +1,244 @@
+﻿@page "/"
+@using FinDocReview.Core.Entities
+@using FinDocReview.Infrastructure.Data
+@using Microsoft.EntityFrameworkCore
+@inject AppDbContext DbContext
+@inject AuthenticationStateProvider AuthStateProvider
+
+<PageTitle>Dashboard</PageTitle>
+
+<h3>Dashboard</h3>
+
+<AuthorizeView>
+    <Authorized>
+        @if (_isLoading)
+        {
+            <p>Loading...</p>
+        }
+        else
+        {
+            <!-- Stats row -->
+            <div class="row mb-4">
+                <div class="col-md-3">
+                    <div class="card text-center">
+                        <div class="card-body">
+                            <h2 class="text-primary">@_totalDocuments</h2>
+                            <small class="text-muted">Total Documents</small>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-3">
+                    <div class="card text-center">
+                        <div class="card-body">
+                            <h2 class="text-success">@_completedDocuments</h2>
+                            <small class="text-muted">Processed</small>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-3">
+                    <div class="card text-center">
+                        <div class="card-body">
+                            <h2 class="text-warning">@_pendingDocuments</h2>
+                            <small class="text-muted">Pending / Processing</small>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-3">
+                    <div class="card text-center">
+                        <div class="card-body">
+                            <h2 class="text-danger">@_failedDocuments</h2>
+                            <small class="text-muted">Failed</small>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="row">
+                <!-- Recent documents -->
+                <div class="col-md-6">
+                    <div class="card mb-4">
+                        <div class="card-header d-flex justify-content-between align-items-center">
+                            <strong>Recent Documents</strong>
+                            <a href="/documents" class="btn btn-sm btn-outline-primary">View All</a>
+                        </div>
+                        <div class="card-body p-0">
+                            @if (_recentDocuments.Count == 0)
+                            {
+                                <p class="p-3 text-muted">No documents yet.</p>
+                            }
+                            else
+                            {
+                                <table class="table table-sm mb-0">
+                                    <tbody>
+                                        @foreach (var doc in _recentDocuments)
+                                        {
+                                            <tr>
+                                                <td>
+                                                    <a href="/documents/@doc.Id">@doc.FileName</a>
+                                                </td>
+                                                <td>
+                                                    <span class="badge @GetStatusBadgeClass(doc.Status)">
+                                                        @doc.Status
+                                                    </span>
+                                                </td>
+                                                <td class="text-muted">
+                                                    <small>@doc.UploadedAt.ToString("MM-dd HH:mm")</small>
+                                                </td>
+                                            </tr>
+                                        }
+                                    </tbody>
+                                </table>
+                            }
+                        </div>
+                    </div>
+
+                    <!-- Failed documents -->
+                    @if (_failedDocumentsList.Count > 0)
+                    {
+                        <div class="card mb-4">
+                            <div class="card-header bg-danger text-white">
+                                <strong>Failed Processing Jobs</strong>
+                            </div>
+                            <div class="card-body p-0">
+                                <table class="table table-sm mb-0">
+                                    <tbody>
+                                        @foreach (var doc in _failedDocumentsList)
+                                        {
+                                            <tr>
+                                                <td>
+                                                    <a href="/documents/@doc.Id">@doc.FileName</a>
+                                                    <br />
+                                                    <small class="text-danger">@doc.ErrorMessage</small>
+                                                </td>
+                                                <td class="text-muted">
+                                                    <small>@doc.UploadedAt.ToString("MM-dd HH:mm")</small>
+                                                </td>
+                                            </tr>
+                                        }
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    }
+                </div>
+
+                <!-- Recent AI queries -->
+                <div class="col-md-6">
+                    <div class="card mb-4">
+                        <div class="card-header">
+                            <strong>Recent AI Queries</strong>
+                        </div>
+                        <div class="card-body p-0">
+                            @if (_recentQueries.Count == 0)
+                            {
+                                <p class="p-3 text-muted">No queries yet.</p>
+                            }
+                            else
+                            {
+                                <div class="list-group list-group-flush">
+                                    @foreach (var query in _recentQueries)
+                                    {
+                                        <div class="list-group-item">
+                                            <div class="fw-bold text-truncate text-primary">
+                                                Q: @query.UserPrompt
+                                            </div>
+                                            <div class="text-truncate small">
+                                                @query.AiResponse
+                                            </div>
+                                            <small class="text-muted">
+                                                @query.CreatedAt.ToString("MM-dd HH:mm") ·
+                                                @query.LatencyMs ms
+                                                @if (query.Document != null)
+                                                {
+                                                    <span> · <a href="/documents/@query.DocumentId">@query.Document.FileName</a></span>
+                                                }
+                                            </small>
+                                        </div>
+                                    }
+                                </div>
+                            }
+                        </div>
+                    </div>
+                </div>
+            </div>
+        }
+    </Authorized>
+    <NotAuthorized>
+        <div class="jumbotron p-5">
+            <h1>AI Document Review Assistant</h1>
+            <p class="lead">
+                Upload financial documents and get AI-powered summaries,
+                risk analysis, and instant Q&A.
+            </p>
+            <a href="/Identity/Account/Register" class="btn btn-primary btn-lg me-2">Get Started</a>
+            <a href="/Identity/Account/Login" class="btn btn-outline-secondary btn-lg">Log In</a>
+        </div>
+    </NotAuthorized>
+</AuthorizeView>
+
+@code {
+    private bool _isLoading = true;
+    private int _totalDocuments;
+    private int _completedDocuments;
+    private int _pendingDocuments;
+    private int _failedDocuments;
+    private List<Document> _recentDocuments = [];
+    private List<Document> _failedDocumentsList = [];
+    private List<AiQueryLog> _recentQueries = [];
+
+    protected override async Task OnInitializedAsync()
+    {
+        var authState = await AuthStateProvider.GetAuthenticationStateAsync();
+        var userId = authState.User.FindFirst(
+            System.Security.Claims.ClaimTypes.NameIdentifier)?.Value;
+
+        if (string.IsNullOrEmpty(userId))
+        {
+            _isLoading = false;
+            return;
+        }
+
+        _totalDocuments = await DbContext.Documents
+            .CountAsync(d => d.UploadedById == userId);
+
+        _completedDocuments = await DbContext.Documents
+            .CountAsync(d => d.UploadedById == userId && d.Status == DocumentStatus.Completed);
+
+        _pendingDocuments = await DbContext.Documents
+            .CountAsync(d => d.UploadedById == userId &&
+                (d.Status == DocumentStatus.Pending || d.Status == DocumentStatus.Processing));
+
+        _failedDocuments = await DbContext.Documents
+            .CountAsync(d => d.UploadedById == userId && d.Status == DocumentStatus.Failed);
+
+        _recentDocuments = await DbContext.Documents
+            .Where(d => d.UploadedById == userId)
+            .OrderByDescending(d => d.UploadedAt)
+            .Take(5)
+            .ToListAsync();
+
+        _failedDocumentsList = await DbContext.Documents
+            .Where(d => d.UploadedById == userId && d.Status == DocumentStatus.Failed)
+            .OrderByDescending(d => d.UploadedAt)
+            .Take(5)
+            .ToListAsync();
+
+        _recentQueries = await DbContext.AiQueryLogs
+            .Include(q => q.Document)
+            .Where(q => q.UserId == userId)
+            .OrderByDescending(q => q.CreatedAt)
+            .Take(10)
+            .ToListAsync();
+
+        _isLoading = false;
+    }
+
+    private static string GetStatusBadgeClass(DocumentStatus status) => status switch
+    {
+        DocumentStatus.Pending => "bg-secondary",
+        DocumentStatus.Processing => "bg-warning text-dark",
+        DocumentStatus.Completed => "bg-success",
+        DocumentStatus.Failed => "bg-danger",
+        _ => "bg-secondary"
+    };
+}
