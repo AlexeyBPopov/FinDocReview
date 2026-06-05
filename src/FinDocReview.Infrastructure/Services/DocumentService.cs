@@ -21,14 +21,14 @@ public class DocumentService
     }
 
     public async Task<Document> UploadDocumentAsync(
-        Stream fileStream,
-        string fileName,
-        string contentType,
-        long fileSize,
-        string userId,
-        CancellationToken ct = default)
+    Stream fileStream,
+    string fileName,
+    string contentType,
+    long fileSize,
+    string userId,
+    CancellationToken ct = default)
     {
-        var localPath = await _storage.SaveFileAsync(fileStream, fileName, ct);
+        var (localPath, blobUri) = await _storage.SaveFileAsync(fileStream, fileName, ct);
 
         var document = new Document
         {
@@ -36,6 +36,7 @@ public class DocumentService
             ContentType = contentType,
             FileSizeBytes = fileSize,
             LocalPath = localPath,
+            BlobUri = blobUri,
             UploadedById = userId,
             Status = DocumentStatus.Pending
         };
@@ -43,7 +44,6 @@ public class DocumentService
         _db.Documents.Add(document);
         await _db.SaveChangesAsync(ct);
 
-        // Enqueue for processing
         await _processingService.EnqueueAsync(document.Id, ct);
 
         return document;
@@ -63,5 +63,17 @@ public class DocumentService
             .Include(d => d.Summary)
             .Include(d => d.QueryLogs.OrderByDescending(q => q.CreatedAt).Take(10))
             .FirstOrDefaultAsync(d => d.Id == id && d.UploadedById == userId, ct);
+    }
+
+    public async Task DeleteDocumentAsync(Guid id, string userId, CancellationToken ct = default)
+    {
+        var document = await _db.Documents
+            .FirstOrDefaultAsync(d => d.Id == id && d.UploadedById == userId, ct);
+
+        if (document == null) return;
+
+        await _storage.DeleteFileAsync(document.LocalPath, document.BlobUri);
+        _db.Documents.Remove(document);
+        await _db.SaveChangesAsync(ct);
     }
 }

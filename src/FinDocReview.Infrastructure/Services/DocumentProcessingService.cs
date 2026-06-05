@@ -71,7 +71,11 @@ public class DocumentProcessingService : BackgroundService
             // 2. Extract text
             var filePath = document.LocalPath ?? document.BlobUri
                 ?? throw new InvalidOperationException("Document has no file path");
-            var text = await textExtractor.ExtractTextAsync(filePath, document.ContentType);
+            var text = await textExtractor.ExtractTextAsync(
+                document.LocalPath,
+                document.BlobUri,
+                document.FileName,
+                ct);
 
             if (string.IsNullOrWhiteSpace(text))
                 throw new InvalidOperationException("No text could be extracted from document");

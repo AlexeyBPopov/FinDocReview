@@ -7,19 +7,53 @@ namespace FinDocReview.Infrastructure.Services;
 
 public class TextExtractionService
 {
-    public Task<string> ExtractTextAsync(string filePath, string contentType)
+    private readonly LocalStorageService _storage;
+
+    public TextExtractionService(LocalStorageService storage)
     {
-        var ext = Path.GetExtension(filePath).ToLowerInvariant();
+        _storage = storage;
+    }
 
-        var text = ext switch
+    public async Task<string> ExtractTextAsync(
+        string? localPath,
+        string? blobUri,
+        string fileName,
+        CancellationToken ct = default)
+    {
+        var ext = Path.GetExtension(fileName).ToLowerInvariant();
+
+        // Download to temp file if using Azure Blob
+        string? tempFile = null;
+        string filePath;
+
+        if (!string.IsNullOrEmpty(blobUri))
         {
-            ".pdf" => ExtractFromPdf(filePath),
-            ".txt" => ExtractFromTxt(filePath),
-            ".docx" => ExtractFromDocx(filePath),
-            _ => throw new NotSupportedException($"File type '{ext}' is not supported.")
-        };
+            tempFile = Path.Combine(Path.GetTempPath(), $"{Guid.NewGuid()}{ext}");
+            await using var stream = await _storage.GetFileAsync(null, blobUri);
+            await using var fs = File.Create(tempFile);
+            await stream.CopyToAsync(fs, ct);
+            filePath = tempFile;
+        }
+        else
+        {
+            filePath = localPath ?? throw new InvalidOperationException("No file path provided");
+        }
 
-        return Task.FromResult(text);
+        try
+        {
+            return ext switch
+            {
+                ".pdf" => ExtractFromPdf(filePath),
+                ".txt" => ExtractFromTxt(filePath),
+                ".docx" => ExtractFromDocx(filePath),
+                _ => throw new NotSupportedException($"File type '{ext}' is not supported.")
+            };
+        }
+        finally
+        {
+            if (tempFile != null && File.Exists(tempFile))
+                File.Delete(tempFile);
+        }
     }
 
     private static string ExtractFromPdf(string filePath)

@@ -55,6 +55,13 @@
                                     View
                                 </a>
                             </td>
+                            @if (doc.Status == DocumentStatus.Failed)
+                            {
+                                <button class="btn btn-sm btn-outline-danger ms-1"
+                                        @onclick="() => DeleteDocument(doc.Id)">
+                                    Delete
+                                </button>
+                            }
                         </tr>
                     }
                 </tbody>
@@ -71,6 +78,7 @@
 @code {
     private List<Document> _documents = [];
     private bool _isLoading = true;
+    private string? _userId;
 
     protected override async Task OnInitializedAsync()
     {
@@ -80,6 +88,8 @@
 
         if (!string.IsNullOrEmpty(userId))
             _documents = await DocumentService.GetUserDocumentsAsync(userId);
+
+        _userId = userId;
 
         _isLoading = false;
     }
@@ -99,4 +109,11 @@
         < 1024 * 1024 => $"{bytes / 1024} KB",
         _ => $"{bytes / (1024 * 1024):F1} MB"
     };
+
+    private async Task DeleteDocument(Guid id)
+    {
+        if (string.IsNullOrEmpty(_userId)) return;
+        await DocumentService.DeleteDocumentAsync(id, _userId);
+        _documents = await DocumentService.GetUserDocumentsAsync(_userId);
+    }
 }
