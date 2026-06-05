@@ -94,7 +94,7 @@ like Hangfire or RabbitMQ required for this scale.
 ### Local Development
 
 ```bash
-git clone https://github.com/your-username/FinDocReview.git
+git clone https://github.com/AlexeyBPopov/FinDocReview.git
 cd FinDocReview
 dotnet user-secrets set "OpenAI:ApiKey" "your-key" --project src/FinDocReview.Web
 dotnet ef database update --project src/FinDocReview.Infrastructure --startup-project src/FinDocReview.Web
